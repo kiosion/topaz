@@ -2,7 +2,6 @@
 
 VERSION="0.0.1"
 CONFIGPATH="$HOME/.config/topaz"
-PIDS=()
 
 VERBOSE=false
 DEBUG=false
@@ -52,7 +51,6 @@ Main() {
         echo "File does not exist"
         exit 1
     fi
-
     if [[ $FILEPATH == *.mp4 ]] || [[ $FILEPATH == *.webm ]] || [[ $FILEPATH == *.gif ]]; then
         if [ $VERBOSE = true ]; then
             echo "Valid file provided!"
@@ -61,17 +59,14 @@ Main() {
         echo "File is not a video or gif."
         exit 1
     fi
-
     if [ ! command -v xwinwrap &> /dev/null ]; then
         echo "xwinwrap could not be found."
         exit 1
     fi
-
     if [ ! command -v mpv &> /dev/null ]; then
         echo "mpv could not be found."
         exit 1
     fi
-
     Run
 }
 
@@ -92,7 +87,7 @@ Run() {
 
 if [ ! -f "$CONFIGPATH/topaz.conf" ]; then
     if [ $VERBOSE = true ]; then
-        echo "Config file not found. Creating one..."
+        echo "Config file not found. Creating..."
     fi
     mkdir -p "$CONFIGPATH"
     touch "$CONFIGPATH/topaz.conf"
@@ -119,22 +114,11 @@ inotifywait -q -e close_write,moved_to,create -m "$CONFIGPATH" | while read -r d
         if [ $VERBOSE = true ]; then
             echo "Config file changed. Reloading..."
         fi
-
         ParseConfig
-
         PIDS=($(pidof xwinwrap))
-        
-        if [ $VERBOSE = true ]; then
-            echo "Killing PIDs:"
-        fi
-        
         for proccess in "${PIDS[@]}"; do
-            if [ $VERBOSE = true ]; then
-                echo "$proccess"
-            fi
             kill -9 "$proccess"
         done
-
         Main
     fi
 done
