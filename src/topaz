@@ -1,0 +1,140 @@
+#!/usr/bin/env sh
+
+VERSION="0.0.1"
+CONFIGPATH="$HOME/.config/topaz"
+PIDS=()
+
+VERBOSE=false
+DEBUG=false
+FILEPATH=""
+MPVOPTS=""
+
+Help() {
+    echo "Usage: topaz [opts] [path/]filename"
+    echo
+    echo "Options or paths specified inline will override the config file."
+    echo
+    echo "Options:"
+    echo "p     Verbose output"
+    echo "h     Print this Help"
+    echo "v     Print version"
+    echo
+}
+
+ParseConfig() {
+    shopt -s extglob
+    tr -d '\r' < "$CONFIGPATH/topaz.conf" > "$CONFIGPATH/topaz.conf.tmp"
+    while IFS='= ' read -r lhs rhs; do
+        if [[ ! $lhs =~ ^\ *# && -n $lhs ]]; then
+            rhs="${rhs%%\#*}"
+            rhs="${rhs%%*( )}"
+            rhs="${rhs%\"*}"
+            rhs="${rhs#\"*}"
+            declare "$lhs=$rhs"
+        fi
+    done < "$CONFIGPATH/topaz.conf.tmp"
+    rm "$CONFIGPATH/topaz.conf.tmp"
+
+    FILEPATH="$file"
+    MPVOPTS="$mpv_options"
+
+    if [ -z "$FILEPATH" ]; then
+        if [ -z "$2" ]; then
+            echo "No file path provided in config or as argument."
+            exit 1
+        fi
+        FILEPATH="$2"
+    fi
+}
+
+Main() {
+    if [ ! -f $FILEPATH ]; then
+        echo "File does not exist"
+        exit 1
+    fi
+
+    if [[ $FILEPATH == *.mp4 ]] || [[ $FILEPATH == *.webm ]] || [[ $FILEPATH == *.gif ]]; then
+        if [ $VERBOSE = true ]; then
+            echo "Valid file provided!"
+        fi
+    else
+        echo "File is not a video or gif."
+        exit 1
+    fi
+
+    if [ ! command -v xwinwrap &> /dev/null ]; then
+        echo "xwinwrap could not be found."
+        exit 1
+    fi
+
+    if [ ! command -v mpv &> /dev/null ]; then
+        echo "mpv could not be found."
+        exit 1
+    fi
+
+    Run
+}
+
+Run() {
+    if [ $VERBOSE = true ]; then
+        echo "Starting xwinwrap..."
+        (nice xwinwrap -b -s -fs -st -sp -nf -ov -fdt -- mpv -wid %WID --framedrop=vo --no-audio --panscan="1.0" --loop $FILEPATH $MPVOPTS) &
+        if [ $VERBOSE = true ]; then
+            echo "Started proccess $!"
+        fi
+    else
+        (nice xwinwrap -b -s -fs -st -sp -nf -ov -fdt -- mpv -wid %WID --framedrop=vo --no-audio --panscan="1.0" --loop $FILEPATH $MPVOPTS &> /dev/null) &
+        if [ $VERBOSE = true ]; then
+            echo "Started proccess $!"
+        fi
+    fi
+}
+
+if [ ! -f "$CONFIGPATH/topaz.conf" ]; then
+    if [ $VERBOSE = true ]; then
+        echo "Config file not found. Creating one..."
+    fi
+    mkdir -p "$CONFIGPATH"
+    touch "$CONFIGPATH/topaz.conf"
+fi
+
+ParseConfig
+
+while getopts :phv option; do
+    case "${option}" in
+        p) VERBOSE=true;;
+        h) Help
+            exit;;
+        v) echo "Topaz v0.0.1"
+            exit;;
+        \?) echo "Invalid option: -$OPTARG" >&2
+            exit 1;;
+    esac
+done
+
+Main
+
+inotifywait -q -e close_write,moved_to,create -m "$CONFIGPATH" | while read -r directory events filename; do
+    if [ "$filename" = "topaz.conf" ]; then
+        if [ $VERBOSE = true ]; then
+            echo "Config file changed. Reloading..."
+        fi
+
+        ParseConfig
+
+        PIDS=($(pidof xwinwrap))
+        
+        if [ $VERBOSE = true ]; then
+            echo "Killing PIDs:"
+        fi
+        
+        for proccess in "${PIDS[@]}"; do
+            if [ $VERBOSE = true ]; then
+                echo "$proccess"
+            fi
+            kill -9 "$proccess"
+        done
+
+        Main
+    fi
+done
