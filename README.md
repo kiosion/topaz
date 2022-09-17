@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>Topaz</h1>
+  <h1>Topaz 💎</h1>
   <p>Lightweight util for handling animated wallpapers under X11 on Arch.</p>
   <img src="https://user-images.githubusercontent.com/34040324/190539508-9507ac4d-14cd-416b-81c5-f8d3e40db433.gif" height="360px" /><br /><br />
 </div>
